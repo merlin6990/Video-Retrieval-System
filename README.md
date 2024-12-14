@@ -38,8 +38,24 @@ The last thing that code does is to update our json and write all the translatio
 ## **Example Data**
 The [first video](https://www.youtube.com/watch?v=GLd3aX16zBg) in our dataset is a special Grilled Cheese Recipe.The json file of the video something like this :
 ```json
-{"GLd3aX16zBg": {"duration": 241.62, "subset": "training", "recipe_type": "113", "annotations": [{"segment": [90, 102], "id": 0, "sentence": "spread margarine on two slices of white bread"}, {"segment": [114, 127], "id": 1, "sentence": "place a slice of cheese on the bread"}, {"segment": [132, 138], "id": 2, "sentence": "place the bread slices on top of each other and place in a hot pan"\}, {"segment": [139, 145], "id": 3, "sentence": "flip the sandwich over and press down"}, {"segment": [173, 174], "id": 4, "sentence": "cut the sandwich in half diagonally"}, "video_url": "https://www.youtube.com/watch?v=GLd3aX16zBg"}
+{"GLd3aX16zBg": {"duration": 241.62, "subset": "training", "recipe_type": "113", "annotations": [{"segment": [90, 102], "id": 0, "sentence": "spread margarine on two slices of white bread"}, {"segment": [114, 127], "id": 1, "sentence": "place a slice of cheese on the bread"}, {"segment": [132, 138], "id": 2, "sentence": "place the bread slices on top of each other and place in a hot pan"}, {"segment": [139, 145], "id": 3, "sentence": "flip the sandwich over and press down"}, {"segment": [173, 174], "id": 4, "sentence": "cut the sandwich in half diagonally"}, "video_url": "https://www.youtube.com/watch?v=GLd3aX16zBg"}
 ```
-
+For instance, someone is spreading some margarine on two slices of bread from the 90th frame up until 102th. The caption is **spread margarine on two slices of white bread**.
+The output json file looks something like this :
+```json
+{"GLd3aX16zBg": {"duration": 241.62, "subset": "training", "recipe_type": "113", "annotations": [{"segment": [90, 102], "id": 0, "sentence": "spread margarine on two slices of white bread", "translation": "\u0645\u0627\u0631\u06af\u0627\u0631\u06cc\u0646 \u0631\u0627 \u0631\u0648\u06cc \u062f\u0648 \u062a\u06a9\u0647 \u0646\u0627\u0646 \u0633\u0641\u06cc\u062f \u067e\u0647\u0646 \u06a9\u0646\u06cc\u062f"}, {"segment": [114, 127], "id": 1, "sentence": "place a slice of cheese on the bread", "translation": "\u06cc\u06a9 \u062a\u06a9\u0647 \u067e\u0646\u06cc\u0631 \u0631\u0648\u06cc \u0646\u0627\u0646 \u0628\u06af\u0630\u0627\u0631"}, {"segment": [132, 138], "id": 2, "sentence": "place the bread slices on top of each other and place in a hot pan", "translation": "\u062a\u06a9\u0647 \u0647\u0627\u06cc \u0646\u0627\u0646 \u0631\u0627 \u0631\u0648\u06cc \u0647\u0645 \u0642\u0631\u0627\u0631 \u062f\u0647\u06cc\u062f \u0648 \u062f\u0631 \u0645\u0627\u0647\u06cc\u062a\u0627\u0628\u0647 \u062f\u0627\u063a \u0642\u0631\u0627\u0631 \u062f\u0647\u06cc\u062f."}, {"segment": [139, 145], "id": 3, "sentence": "flip the sandwich over and press down", "translation": "\u0633\u0627\u0646\u062f\u0648\u06cc\u0686 \u0631\u0627 \u0628\u0647 \u0637\u0631\u0641 \u067e\u0627\u06cc\u06cc\u0646 \u067e\u0631\u062a \u06a9\u0646 \u0648 \u0641\u0634\u0627\u0631\u0634 \u0628\u062f\u0647"}, {"segment": [173, 174], "id": 4, "sentence": "cut the sandwich in half diagonally", "translation": "\u0633\u0627\u0646\u062f\u0648\u06cc\u0686 \u0631\u0627 \u0628\u0647 \u0637\u0648\u0631 \u0645\u0648\u0631\u0628 \u0646\u0635\u0641 \u06a9\u0646\u06cc\u062f"}], "video_url": "https://www.youtube.com/watch?v=GLd3aX16zBg"}
+```
+All the characters that start with \u are persian unicode characters that we will use to finetune our VLM model.
+Here you can see the translation of some sample captions:
+```html
+<pre>
+<span style="color:black; font-weight:bold;">Caption1:spread margarine on two slices of white bread.</span>
+<span style="color:blue;">مارگارین را روی دو تکه نان سفید پهن کنید</span>
+<span style="color:black; font-weight:bold;">Caption2:place the bread slices on top of each other and place in a hot pan.</span>
+<span style="color:blue;">تکه های نان را روی هم قرار دهید و در ماهیتابه داغ قرار دهید</span>
+<span style="color:black; font-weight:bold;">Caption3:cut the sandwich in half diagonally.</span>
+<span style="color:blue;">ساندویچ را به طور مورب نصف کنید</span>
+</pre>
+```
 
 
