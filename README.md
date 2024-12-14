@@ -9,11 +9,31 @@ The dataset that was chosen for this project is YouCook2 dataset. Some general i
 The total video time for the dataset is 176 hours with an average length of 5.26 mins for each video. Each video captured is within 10 mins and is recorded by camera devices but not slideshows. All the videos and precomputed feature can be downloaded in the Download page.
 Each video contains some number of procedure steps to fulfill a recipe. All the procedure segments are temporal localized in the video with starting time and ending time. The distributions of 1) video duration, 2) number of recipe steps per video, 3) recipe segment duration and 4) number of words per sentence are shown below
 ## **Data Preparation**
-The main challenge in this project is to obtain persian-labled pictures. To overcome this issue, we wrote a script that uses an NMT to translate all the english captions of YouCook2 and adds it as a new field to output.json which holds some crucial information such as the youtube link of the video.
-**Rendered Output**:
+The main challenge in this project is to obtain persian-labled pictures. To overcome this issue, we wrote a script that uses an NMT to translate all the english captions of YouCook2 and adds it as a new field to output.json which holds some crucial information such as the youtube link of the video. The most important part of the code is **run_model_batch()** that reads the captions batch by batch and feeds it to our Transformer model and receives the translation of the captions.
 ```python
-def hello_world():
-    print("Hello, World!")
+def run_model_batch(input_strings, batch_size=128,max_new_tokens=50,initial_index=0, **generator_args):
+    translations = []
+    counter=initial_index
+    start=tic()
+    elapsed_time=0
+    #trans_check=initial_index
+    for i in range(initial_index, len(input_strings), batch_size):
+        batch = input_strings[i:i + batch_size]
+        inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True)
+        # Move input tensors to GPU
+        input_ids = inputs['input_ids'].to(device)
+        attention_mask = inputs['attention_mask'].to(device)
+
+        res = model.generate(input_ids, attention_mask=attention_mask,max_new_tokens=max_new_tokens, **generator_args)
+        outputs = tokenizer.batch_decode(res, skip_special_tokens=True)
+        translations.extend(outputs)
+        if(toc(start)>=60):
+          elapsed_time+=toc(start)
+          print(f"Number of sentences translated : {len(translations)} , Elapsed time : {elapsed_time} seconds")
+          start=tic()
+    return translations
+```
+
 
 
 
