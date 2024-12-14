@@ -4,6 +4,7 @@ In this project we aim to implement a video retrieval system that, given a persi
 ## **Table of Contents**
 1. [Chosen Dataset](#Chosen-Dataset)
 2. [Data Preparation](#Data-Preparation)
+3. [Example Data](#Example-Data)
 ## **Chosen Dataset**
 The dataset that was chosen for this project is YouCook2 dataset. Some general information about the dataset is given below and directly extracted from the datasets's website which can be found [here](http://youcook2.eecs.umich.edu/).
 The total video time for the dataset is 176 hours with an average length of 5.26 mins for each video. Each video captured is within 10 mins and is recorded by camera devices but not slideshows. All the videos and precomputed feature can be downloaded in the Download page.
@@ -33,8 +34,12 @@ def run_model_batch(input_strings, batch_size=128,max_new_tokens=50,initial_inde
           start=tic()
     return translations
 ```
-
-
+The last thing that code does is to update our json and write all the translations to the json file.
+## **Example Data**
+The [first video](https://www.youtube.com/watch?v=GLd3aX16zBg) in our dataset is a special Grilled Cheese Recipe.The json file of the video something like this :
+```json
+{"GLd3aX16zBg": {"duration": 241.62, "subset": "training", "recipe_type": "113", "annotations": [{"segment": [90, 102], "id": 0, "sentence": "spread margarine on two slices of white bread"}, {"segment": [114, 127], "id": 1, "sentence": "place a slice of cheese on the bread"}, {"segment": [132, 138], "id": 2, "sentence": "place the bread slices on top of each other and place in a hot pan"\}, {"segment": [139, 145], "id": 3, "sentence": "flip the sandwich over and press down"}, {"segment": [173, 174], "id": 4, "sentence": "cut the sandwich in half diagonally"], "video_url": "https://www.youtube.com/watch?v=GLd3aX16zBg"}
+```
 
 
 
