@@ -47,15 +47,17 @@ The output json file looks something like this :
 ```
 All the characters that start with \u are persian unicode characters that we will use to finetune our VLM model.
 Here you can see the translation of some sample captions:
-```html
-<pre>
-<span style="color:black; font-weight:bold;">Caption1:spread margarine on two slices of white bread.</span>
-<span style="color:blue;">مارگارین را روی دو تکه نان سفید پهن کنید</span>
-<span style="color:black; font-weight:bold;">Caption2:place the bread slices on top of each other and place in a hot pan.</span>
-<span style="color:blue;">تکه های نان را روی هم قرار دهید و در ماهیتابه داغ قرار دهید</span>
-<span style="color:black; font-weight:bold;">Caption3:cut the sandwich in half diagonally.</span>
-<span style="color:blue;">ساندویچ را به طور مورب نصف کنید</span>
-</pre>
+```yaml
+captions:
+  - caption1: 
+      en: "Spread margarine on two slices of white bread."
+      fa: "مارگارین را روی دو تکه نان سفید پهن کنید"
+  - caption2:
+      en: "Place the bread slices on top of each other and place in a hot pan."
+      fa: "تکه های نان را روی هم قرار دهید و در ماهیتابه داغ قرار دهید"
+  - caption3:
+      en: "Cut the sandwich in half diagonally."
+      fa: "ساندویچ را به طور مورب نصف کنید"
 ```
 
 
