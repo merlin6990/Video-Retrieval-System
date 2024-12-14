@@ -43,7 +43,7 @@ The [first video](https://www.youtube.com/watch?v=GLd3aX16zBg) in our dataset is
 For instance, someone is spreading some margarine on two slices of bread from the 90th frame up until 102th. The caption is **spread margarine on two slices of white bread**.
 
 ![a sample frame from the video chosen from 90-102 interval](./images/sample.png)
-*Figure 1: sample frame*
+*Figure 1: a sample frame from the video chosen from 90-102 interval*
 
 The output json file looks something like this :
 ```json
