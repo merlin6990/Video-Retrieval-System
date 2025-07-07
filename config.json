@@ -1,0 +1,6 @@
+{
+  "index_path": "faiss_index.index",
+  "mapping_path": "vector_mapping.json",
+  "embedding_dim": 512,
+  "clip_model_name": "openai/clip-vit-base-patch32"
+}
