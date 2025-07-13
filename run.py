@@ -40,7 +40,7 @@ def main():
     # Add videos
     add_parser = subparsers.add_parser("add", help="Add videos to the database")
     add_parser.add_argument("--video_paths", nargs="+", required=True, help="Paths to video files")
-    add_parser.add_argument("--sampling_rate", type=int, default=1, help="Frame sampling rate (frames per second)")
+    add_parser.add_argument("--frames_per_second", type=int, default=1, help="Frame sampling rate (frames per second)")
 
     # Retrieve videos
     retrieve_parser = subparsers.add_parser("retrieve", help="Retrieve similar videos by text prompt")
@@ -68,7 +68,7 @@ def main():
             model=model,
             processor=processor,
             mapping_path=config["mapping_path"],
-            sampling_rate=args.sampling_rate
+            frames_per_second=args.frames_per_second
         )
 
     elif args.command == "retrieve":

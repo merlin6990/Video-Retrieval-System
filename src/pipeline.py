@@ -1,3 +1,4 @@
+from __future__ import annotations
 from PIL import Image
 import torch
 import cv2
@@ -5,159 +6,185 @@ import os
 import json
 import faiss
 import numpy as np
+from typing import List, Tuple, Dict, Any
 
-def extract_frames(video_path, sampling_rate=1):
+# ---------------------------------------------------------------------
+# 1. Utility: always give FAISS float32
+# ---------------------------------------------------------------------
+def _to_float32(arr: torch.Tensor | np.ndarray) -> np.ndarray:
+    """
+    Ensure numpy float32 (required by FAISS).
+    Accepts a torch Tensor (any dtype/device) or a numpy array.
+    """
+    if isinstance(arr, torch.Tensor):
+        arr = arr.detach().cpu().numpy()
+    if arr.dtype != np.float32:
+        arr = arr.astype(np.float32, copy=False)
+    return arr
 
-    # Check if the video file exists
+
+# ---------------------------------------------------------------------
+# 2. Video frame extraction
+# ---------------------------------------------------------------------
+def extract_frames(
+    video_path: str,
+    frames_per_second: float = 1.0,
+) -> Tuple[List[np.ndarray], List[Dict[str, Any]]]:
+    """
+    Down‑samples a video to `frames_per_second` and returns:
+        • list of BGR frames (as numpy arrays)
+        • parallel list of metadata dicts  {path: str, time: float}
+    """
     if not os.path.exists(video_path):
-        raise FileNotFoundError(f"The video file {video_path} does not exist.")
+        raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    # Initialize video capture
-    video_capture = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Cannot open video: {video_path}")
 
-    if not video_capture.isOpened():
-        raise ValueError(f"Cannot open video file {video_path}.")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    step = max(1, int(round(fps / frames_per_second)))
 
-    frames = []
-    frames_metadata = []
-    frame_rate = video_capture.get(cv2.CAP_PROP_FPS)  # Frames per second of the video
-    total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    # Calculate the interval in terms of frame indices
-    interval = int(frame_rate / sampling_rate)
-
-    frame_index = 0
-    time = 0
-    while frame_index < total_frames:
-        video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-        success, frame = video_capture.read()
-
-        if not success:
+    frames, meta = [], []
+    for frame_idx in range(0, total_frames, step):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ok, frame = cap.read()
+        if not ok:
             break
-
         frames.append(frame)
+        meta.append({"path": video_path, "time": frame_idx / fps})
 
-        metadata = {'path':video_path, 'time':time}
-        frames_metadata.append(metadata)
-
-        frame_index += interval
-        time += 1
-
-    video_capture.release()
-    return frames, frames_metadata
+    cap.release()
+    return frames, meta
 
 
-def convert_frames_to_vectors(frames, model, processor):
-
-    # Convert frames to PIL images
-    pil_images = [Image.fromarray(frame) for frame in frames]
-
-    # Preprocess images for CLIP
-    inputs = processor(images=pil_images, return_tensors="pt", padding=True)
-
-    # Use the provided CLIP model to get image embeddings
+# ---------------------------------------------------------------------
+# 3. CLIP → vectors
+# ---------------------------------------------------------------------
+def convert_frames_to_vectors(
+    frames: List[np.ndarray],
+    model,
+    processor,
+) -> np.ndarray:
+    """
+    Returns a 2‑D numpy float32 array shape (N, D) ready for FAISS.
+    """
+    pil = [Image.fromarray(f) for f in frames]
+    inputs = processor(images=pil, return_tensors="pt", padding=True)
     with torch.no_grad():
-        embeddings = model.get_image_features(**inputs)
-
-    # Normalize embeddings for cosine similarity
-    normalized_embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-
-    # Convert embeddings to a list of numpy arrays
-    vector_list = normalized_embeddings.cpu().numpy()
-
-    return vector_list
+        emb = model.get_image_features(**inputs)
+    emb = torch.nn.functional.normalize(emb, p=2, dim=1)
+    return _to_float32(emb)  # -> np.float32
 
 
-def add_embeddings_with_mapping(index, index_path, new_embeddings, metadata_list, mapping_path="vector_mapping.json"):
+# ---------------------------------------------------------------------
+# 4. Add vectors + save mapping/index
+# ---------------------------------------------------------------------
+def add_embeddings_with_mapping(
+    index: faiss.Index,
+    index_path: str,
+    vectors: np.ndarray,
+    metadata: List[Dict[str, Any]],
+    mapping_path: str = "vector_mapping.json",
+) -> faiss.Index:
 
-    # Check the dimensionality
-    d = index.d  # Dimensionality of the index
-    if new_embeddings.shape[1] != d:
-        raise ValueError(f"Embedding dimension {new_embeddings.shape[1]} does not match index dimension {d}.")
+    # Dimension guard
+    if vectors.shape[1] != index.d:
+        raise ValueError(
+            f"Embedding dim {vectors.shape[1]} ≠ index dim {index.d}"
+        )
 
-    # Load or initialize the mapping
-    try:
+    # Load mapping (keys stored as *strings* consistently)
+    mapping: Dict[str, Any]
+    if os.path.exists(mapping_path):
         with open(mapping_path, "r") as f:
             mapping = json.load(f)
-    except FileNotFoundError:
+    else:
         mapping = {}
 
-    # Get the current number of vectors in the index
-    current_count = index.ntotal
+    start = index.ntotal
+    index.add(vectors)
+    for i, md in enumerate(metadata):
+        mapping[str(start + i)] = md
 
-    # Add new embeddings to the FAISS index
-    index.add(new_embeddings)
-    print(f"Added {new_embeddings.shape[0]} new embeddings to the FAISS index.")
-
-    # Update the mapping with new indices
-    for i, metadata in enumerate(metadata_list):
-        mapping[current_count + i] = metadata
-
-    # Save the updated mapping to disk
+    # Persist
     with open(mapping_path, "w") as f:
         json.dump(mapping, f)
-    print(f"Updated mapping saved at {mapping_path}.")
-
-    # Save the updated FAISS index
     faiss.write_index(index, index_path)
-    print(f"Updated FAISS index saved at {index_path}.")
-
     return index
 
 
-def retrieve_similar_images_with_text(query, model, processor, index, top_k=3):
-
-    # Preprocess the text query
+# ---------------------------------------------------------------------
+# 5. Text query → indices
+# ---------------------------------------------------------------------
+def retrieve_similar_images_with_text(
+    query: str,
+    model,
+    processor,
+    index: faiss.Index,
+    top_k: int = 3,
+) -> Tuple[str, np.ndarray, np.ndarray]:
     inputs = processor(text=query, return_tensors="pt", padding=True)
-
-    # Extract text embeddings using CLIP
     with torch.no_grad():
-        query_features = model.get_text_features(**inputs)
-
-    # Normalize the text embeddings for cosine similarity (if index uses cosine)
-    query_features = torch.nn.functional.normalize(query_features, p=2, dim=1)
-    query_features = query_features.cpu().numpy().astype(np.float32)
-
-    # Search for similar images in the FAISS index
-    distances, indices = index.search(query_features, top_k)
-
+        q_vec = model.get_text_features(**inputs)
+    q_vec = torch.nn.functional.normalize(q_vec, p=2, dim=1)
+    q_vec = _to_float32(q_vec)
+    distances, indices = index.search(q_vec, top_k)
     return query, distances, indices
 
 
-def get_metadata_from_faiss_indices(indices, mapping_path="vector_mapping.json"):
-
-    # Load the mapping
+# ---------------------------------------------------------------------
+# 6. Index‑to‑metadata
+# ---------------------------------------------------------------------
+def get_metadata_from_faiss_indices(
+    indices: np.ndarray,
+    mapping_path: str = "vector_mapping.json",
+) -> List[Any]:
     with open(mapping_path, "r") as f:
         mapping = json.load(f)
-    
-    # Retrieve metadata for each index
-    metadata = [mapping.get(str(index), None) for index in indices[0]]
-    return metadata
+    return [mapping.get(str(idx)) for idx in indices[0]]
 
 
-def initialize_database(dimension, index_path):  
-  index = faiss.IndexFlatIP(dimension)
-
-  # Save the FAISS index to disk
-  faiss.write_index(index, index_path)
-  print(f"FAISS index saved at {index_path}.")
-  return index
-
-
-def add_to_db(video_paths, index, index_path, model, processor, mapping_path="vector_mapping.json", sampling_rate=1):
-
-  for path in video_paths:
-    frames, metadata_list = extract_frames(path, sampling_rate)
-    embeddings = convert_frames_to_vectors(frames, model, processor)
-    add_embeddings_with_mapping(index, index_path, embeddings, metadata_list, mapping_path=mapping_path)
-
-  print(f"videos with following paths have been added to the database:")
-  for path in video_paths:
-    print(path)
+# ---------------------------------------------------------------------
+# 7. Database helpers (unchanged API)
+# ---------------------------------------------------------------------
+def initialize_database(
+    dimension: int,
+    index_path: str,
+) -> faiss.Index:
+    index = faiss.IndexFlatIP(dimension)
+    faiss.write_index(index, index_path)
+    return index
 
 
-def retrieve(query, model, processor, index, top_k=3, mapping_path="vector_mapping.json"):
+def add_to_db(
+    video_paths: List[str],
+    index: faiss.Index,
+    index_path: str,
+    model,
+    processor,
+    mapping_path: str = "vector_mapping.json",
+    frames_per_second: float = 1.0,
+) -> None:
+    for p in video_paths:
+        frames, meta = extract_frames(p, frames_per_second)
+        vecs = convert_frames_to_vectors(frames, model, processor)
+        add_embeddings_with_mapping(
+            index, index_path, vecs, meta, mapping_path
+        )
+    print("Added videos:\n  " + "\n  ".join(video_paths))
 
-  _, _, indices = retrieve_similar_images_with_text(query, model, processor, index, top_k=top_k)  
-  metadata = get_metadata_from_faiss_indices(indices, mapping_path=mapping_path)
-  return metadata
+
+def retrieve(
+    query: str,
+    model,
+    processor,
+    index: faiss.Index,
+    top_k: int = 3,
+    mapping_path: str = "vector_mapping.json",
+):
+    _, _, idxs = retrieve_similar_images_with_text(
+        query, model, processor, index, top_k
+    )
+    return get_metadata_from_faiss_indices(idxs, mapping_path=mapping_path)
